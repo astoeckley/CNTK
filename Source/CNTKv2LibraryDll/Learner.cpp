@@ -305,7 +305,7 @@ namespace CNTK
         m_minibatchCount = checkpoint[minibatchCountKey].Value<size_t>();
         // TODO: which learning rate schedule should take precedence here? 
         // The one given at construction time or the one loaded from a checkpoint?
-        m_learningRateSchedule = TrainingParameterSchedule<double>::Load(checkpoint[learningRateScheduleKey].Value<Dictionary>());
+        m_learningRateSchedule = TrainingParameterSchedule<double>::Deserialize(checkpoint[learningRateScheduleKey].Value<Dictionary>());
 
         auto parameters = Parameters();
         auto dictParameters = checkpoint[parametersKey].Value<vector<DictionaryValue>>();

@@ -22,9 +22,6 @@
 #include<algorithm>
 #include <mutex>
 
-
-#include <iostream>
-
 #ifdef SWIG
 #define final
 #define explicit
@@ -1391,7 +1388,16 @@ namespace CNTK
             return Contains(key.c_str());
         }
 
-        CNTK_API std::vector<std::wstring> Keys() const;
+        CNTK_API std::vector<std::wstring> Keys() const
+        {
+            std::vector<std::wstring> keys;
+            keys.reserve(m_dictionaryData->size());
+            for (const auto&it : *m_dictionaryData)
+            {
+                keys.push_back(it.first);
+            }
+            return keys;
+        }
 
         CNTK_API void Add(const Dictionary& other);
 
@@ -1621,7 +1627,7 @@ private:
         template <typename ElementType>
         static NDArrayViewPtr CreateValueFromParameterInitializer(const NDShape& shape, const ParameterInitializer& initConfig, const DeviceDescriptor& device);
 
-        CNTK_API static Variable Load(const Dictionary& dictionary, const CNTK::DeviceDescriptor& device = DeviceDescriptor::UseDefaultDevice());
+        CNTK_API static Variable Deserialize(const Dictionary& dictionary, const CNTK::DeviceDescriptor& device = DeviceDescriptor::UseDefaultDevice());
 
     private:
 
@@ -1689,6 +1695,7 @@ private:
         static const size_t s_serializationVersion = 1;
     };
 
+    // TODO: Variable equality should be based on uids.
     inline bool operator==(const Variable& first, const Variable& second)
     {
         return first.m_dataFields == second.m_dataFields;
@@ -1978,7 +1985,7 @@ namespace std {
         }
     };
 
-    
+    // TODO: Variable hash should be based on uid.
     template <> struct hash<CNTK::Variable>
     {
         size_t operator()(const CNTK::Variable& x) const
@@ -2120,14 +2127,14 @@ namespace CNTK
         ///
         /// Generates a dictionary that captures the state of the Function graph underlying this Function.
         ///
-        CNTK_API virtual Dictionary Serialize() const override { return Dictionary(); }
+        virtual Dictionary Serialize() const override { return Dictionary(); }
 
         ///
-        /// Loads a Function from the dictionary.
+        /// Deserializes a Function from the dictionary.
         /// TODO: add a second overload with a 'function builder' parameter that would allow hooking
         /// user-defined op-codes with custom functionality.
         ///
-        CNTK_API static FunctionPtr Load(const Dictionary& modelDictionary, const CNTK::DeviceDescriptor& device = DeviceDescriptor::UseDefaultDevice());
+        CNTK_API static FunctionPtr Deserialize(const Dictionary& modelDictionary, const CNTK::DeviceDescriptor& device = DeviceDescriptor::UseDefaultDevice());
 
     public:
         ///
@@ -2723,7 +2730,7 @@ namespace CNTK
 
         virtual size_t CurrentVersion() const override { return s_serializationVersion; }
 
-        CNTK_API static TrainingParameterSchedule<T> Load(const Dictionary& dictionary);
+        CNTK_API static TrainingParameterSchedule<T> Deserialize(const Dictionary& dictionary);
 
     private:
         CNTK_API void ConstructSchedule(const std::vector<std::pair<size_t, T>>& schedule);
@@ -2804,12 +2811,12 @@ namespace CNTK
         ///
         /// Optionally overridable method to checkpoint the learner's state.
         ///
-        CNTK_API virtual Dictionary Serialize() const override { return Dictionary(); }
+        virtual Dictionary Serialize() const override { return Dictionary(); }
 
         ///
         /// Optionally overridable method to restore the learner's state from a previous checkpoint.
         ///
-        CNTK_API virtual void RestoreFromCheckpoint(const Dictionary&) { NOT_IMPLEMENTED }
+        virtual void RestoreFromCheckpoint(const Dictionary&) { NOT_IMPLEMENTED }
 
         ///
         /// Destruct this Learner.
@@ -2819,7 +2826,7 @@ namespace CNTK
         ///
         /// This method needs to be explicitly overriden in subclasses.
         ///
-        CNTK_API virtual size_t CurrentVersion() const override { NOT_IMPLEMENTED }
+        virtual size_t CurrentVersion() const override { NOT_IMPLEMENTED }
 
 
         ///
@@ -2955,6 +2962,7 @@ namespace CNTK
         ///
         /// Restore the model and trainer state from a previously saved model and checkpoint from the specified file location
         ///
+        /// TODO: drop the legacy flag and auto-detect model format.
         CNTK_API void RestoreFromCheckpoint(const std::wstring& modelFilePath, bool usingLegacyModelFormat = true);
 
         ///

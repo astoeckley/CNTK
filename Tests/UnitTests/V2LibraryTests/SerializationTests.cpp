@@ -3,6 +3,7 @@
 // Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 //
 #include "CNTKLibrary.h"
+#include "PrimitiveOpType.h"
 #include "Common.h"
 #include <string>
 #include <random>
@@ -331,7 +332,7 @@ void TestFunctionSaveAndLoad(const FunctionPtr& function, const DeviceDescriptor
         *stream >> model;
     }
 
-    auto reloadedFunction = Function::Load(model, device);
+    auto reloadedFunction = Function::Deserialize(model, device);
 
     if (!AreEqual(function, reloadedFunction))
     {
@@ -397,7 +398,7 @@ void TestFunctionSerializationDuringTraining(const FunctionPtr& function, const 
 
     trainer1.TrainMinibatch({ { classifierOutput1->Arguments()[0], minibatchData[featureStreamInfo].m_data }, { labels, minibatchData[labelStreamInfo].m_data } }, device);
 
-    auto classifierOutput2 = Function::Load(model, device);
+    auto classifierOutput2 = Function::Deserialize(model, device);
 
     if (AreEqual(classifierOutput1, classifierOutput2))
     {
@@ -408,7 +409,7 @@ void TestFunctionSerializationDuringTraining(const FunctionPtr& function, const 
     {
         Dictionary model = classifierOutput1->Serialize();
 
-        auto classifierOutput2 = Function::Load(model, device);
+        auto classifierOutput2 = Function::Deserialize(model, device);
 
         if (!AreEqual(classifierOutput1, classifierOutput2))
         {
@@ -440,7 +441,7 @@ void TestModelSerializationDuringTraining(const DeviceDescriptor& device)
     auto features1 = InputVariable({ inputDim }, false /*isSparse*/, DataType::Float, featureStreamName);
     auto labels1 = InputVariable({ numOutputClasses }, DataType::Float, labelsStreamName);
     auto net1 = BuildFFClassifierNet(features1, numOutputClasses, device);
-    auto minibatchSource1 = TextFormatMinibatchSource(L"Train-28x28_cntk_text.txt", { { featureStreamName, inputDim }, { labelsStreamName, numOutputClasses } });
+    auto minibatchSource1 = TextFormatMinibatchSource(L"Train-28x28_cntk_text.txt", { { featureStreamName, inputDim }, { labelsStreamName, numOutputClasses } }, 1000, false);
 
     TestFunctionSerializationDuringTraining(net1, labels1, minibatchSource1, device);
 
@@ -452,7 +453,7 @@ void TestModelSerializationDuringTraining(const DeviceDescriptor& device)
     auto features2 = InputVariable({ inputDim }, true /*isSparse*/, DataType::Float, featureStreamName);
     auto labels2 = InputVariable({ numOutputClasses }, DataType::Float, labelsStreamName, { Axis::DefaultBatchAxis() });
     auto net2 = BuildLSTMClassifierNet(features2, numOutputClasses, device);
-    auto minibatchSource2 = TextFormatMinibatchSource(L"Train.ctf", { { featureStreamName, inputDim, true, L"x" }, {  labelsStreamName, numOutputClasses, false, L"y" } }, 0);
+    auto minibatchSource2 = TextFormatMinibatchSource(L"Train.ctf", { { featureStreamName, inputDim, true, L"x" }, {  labelsStreamName, numOutputClasses, false, L"y" } },  1000, false);
 
     TestFunctionSerializationDuringTraining(net2, labels2, minibatchSource2, device);
 }
@@ -536,7 +537,7 @@ void TestCheckpointing(const DeviceDescriptor& device)
     auto labels1 = InputVariable({ numOutputClasses }, DataType::Float, labelsStreamName);
     auto net1_1 = BuildFFClassifierNet(features1, numOutputClasses, device);
     auto net1_2 = BuildFFClassifierNet(features1, numOutputClasses, device);
-    auto minibatchSource1 = TextFormatMinibatchSource(L"Train-28x28_cntk_text.txt", { { featureStreamName, inputDim }, { labelsStreamName, numOutputClasses } });
+    auto minibatchSource1 = TextFormatMinibatchSource(L"Train-28x28_cntk_text.txt", { { featureStreamName, inputDim }, { labelsStreamName, numOutputClasses } },  1000, false);
 
     TestTrainingWithCheckpointing(net1_1, net1_2, labels1, minibatchSource1, device);
 
@@ -546,7 +547,7 @@ void TestCheckpointing(const DeviceDescriptor& device)
     auto labels2 = InputVariable({ numOutputClasses }, DataType::Float, labelsStreamName, { Axis::DefaultBatchAxis() });
     auto net2_1 = BuildLSTMClassifierNet(features2, numOutputClasses, device);
     auto net2_2 = BuildLSTMClassifierNet(features2, numOutputClasses, device);
-    auto minibatchSource2 = TextFormatMinibatchSource(L"Train.ctf", { { featureStreamName, inputDim, true, L"x" }, {  labelsStreamName, numOutputClasses, false, L"y" } }, 0);
+    auto minibatchSource2 = TextFormatMinibatchSource(L"Train.ctf", { { featureStreamName, inputDim, true, L"x" }, {  labelsStreamName, numOutputClasses, false, L"y" } }, 1000, false);
 
     TestTrainingWithCheckpointing(net2_1, net2_2, labels2, minibatchSource2, device);
 }

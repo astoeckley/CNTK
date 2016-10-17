@@ -212,13 +212,19 @@ namespace CNTK
         dict[shapeKey] = Shape();
         if (IsParameter() || IsConstant())
         {
+            NDArrayView* value = Value().get();
+            if (value == nullptr)
+            {
+                LogicError("Uninitialized Parameter variable cannot be saved");
+            }
+
             // TODO: add a dictionary value constructor with an rvalue parameter.
-            dict[valueKey] = DictionaryValue(*(Value().get()));
+            dict[valueKey] = DictionaryValue(*value);
         }
         return dict;
     }
 
-    /*static*/ Variable Variable::Load(const Dictionary& dict, const CNTK::DeviceDescriptor& device)
+    /*static*/ Variable Variable::Deserialize(const Dictionary& dict, const CNTK::DeviceDescriptor& device)
     {
         static const vector<std::wstring> s_requiredDictionaryKeys = { typeKey, uidKey, kindKey, dataTypeKey, dynamicAxisKey, isSparseKey, nameKey, needsGradientKey, shapeKey };
 

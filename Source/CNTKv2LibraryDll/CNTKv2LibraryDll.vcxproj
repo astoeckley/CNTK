@@ -131,6 +131,7 @@
     <ClInclude Include="Function.h" />
     <ClInclude Include="Learner.h" />
     <ClInclude Include="MinibatchSource.h" />
+    <ClInclude Include="PrimitiveOpType.h" />
     <ClInclude Include="Serialization.h" />
     <ClInclude Include="Utils.h" />
     <ClInclude Include="stdafx.h" />

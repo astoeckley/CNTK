@@ -142,16 +142,10 @@ namespace CNTK
             rootGradientValue->Data()->SetValue(1.0);
 
         auto modelParameters = m_combinedTrainingFunction->Parameters();
-        // Since Variable hash function depends on the memory address pointed to by the m_dataFields,
-        // after restoring from a checkpoint, when model parameters created fresh,
-        // model parameters and learners' parameters no longer hash to the same value,
-        //  we need to use uid map here to be able to match parameters.
-        std::unordered_map<std::wstring, Variable> uidToParameterMap;
         std::unordered_map<Variable, ValuePtr> parameterGradients;
         for (const auto& parameter : modelParameters)
         {
             parameterGradients[parameter] = nullptr;
-            uidToParameterMap[parameter.Uid()] = parameter;
         }
 
         m_combinedTrainingFunction->Backward(backPropSate, { { m_aggregatedLossFunction, rootGradientValue } }, parameterGradients);
@@ -164,12 +158,11 @@ namespace CNTK
         {
             std::unordered_map<Parameter, NDArrayViewPtr> learnerParameterGradients;
             const auto& learnerParameters = learner->Parameters();
-            for (const auto& learnerParameter : learnerParameters)
+            for (const auto& parameter : learnerParameters)
             {
-                const auto& modelParameter = uidToParameterMap[learnerParameter.Uid()];
-                learnerParameterGradients[learnerParameter] = parameterGradients[modelParameter]->Data();
+                learnerParameterGradients[parameter] = parameterGradients[parameter]->Data();
 
-                if (parameterGradients[modelParameter]->Mask())
+                if (parameterGradients[parameter]->Mask())
                     LogicError("The gradient value for a Parameter cannot have an associated mask!");
             }
 

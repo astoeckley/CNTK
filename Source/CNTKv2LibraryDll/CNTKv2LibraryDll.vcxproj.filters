@@ -35,6 +35,7 @@
     </ClInclude>
     <ClInclude Include="Serialization.h" />
     <ClInclude Include="Value.h" />
+    <ClInclude Include="PrimitiveOpType.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="API">

@@ -81,17 +81,21 @@ namespace CNTK
     {
         visitedFunctions.insert(this);
 
-        for (auto& inputVar : m_inputs)
-        {
-            if (inputVar.IsPlaceholder())
+        auto replacePlaceholder = [&placeholderReplacements, &replacedPlaceholders](Variable& var) {
+            if (var.IsPlaceholder())
             {
-                auto placeholder = inputVar;
+                auto placeholder = var;
                 if (placeholderReplacements.find(placeholder) != placeholderReplacements.end())
                 {
-                    inputVar = placeholderReplacements.at(placeholder);
+                    var = placeholderReplacements.at(placeholder);
                     replacedPlaceholders.insert(placeholder);
                 }
             }
+        };
+
+        for (auto& inputVar : m_inputs)
+        {
+            replacePlaceholder(inputVar);
 
             if (inputVar.IsOutput() && (visitedFunctions.find(inputVar.Owner().get()) == visitedFunctions.end()))
             {
@@ -107,15 +111,7 @@ namespace CNTK
             // still can be placeholders cached in m_outputs, need to replace those as well.
             for (auto& outputVar : m_outputs)
             {
-                if (outputVar.IsPlaceholder())
-                {
-                    auto placeholder = outputVar;
-                    if (placeholderReplacements.find(placeholder) != placeholderReplacements.end())
-                    {
-                        outputVar = placeholderReplacements.at(placeholder);
-                        replacedPlaceholders.insert(placeholder);
-                    }
-                }
+                replacePlaceholder(outputVar);
             }
         }
     }
@@ -439,13 +435,13 @@ namespace CNTK
     }
 
 
-    /*virtual*/ void Function::RestoreFromCheckpoint(const Dictionary& modelDictionar)
+    /*virtual*/ void Function::RestoreFromCheckpoint(const Dictionary& modelDictionary)
     {
         CompositeFunction* compositeFunction = dynamic_cast<CompositeFunction*>(this);
         if (compositeFunction == nullptr)
             InvalidArgument("Primitive (aka non-composite) Function instances cannot be restored from a checkpoint.");
 
-        auto restoredFunction = Function::Load(modelDictionar, DeviceDescriptor::CPUDevice());
+        auto restoredFunction = Function::Deserialize(modelDictionary, DeviceDescriptor::CPUDevice());
 
         if (!Internal::AreEquivalent(shared_from_this(), restoredFunction))
             InvalidArgument("This function is not equivalent (isomorphic) to the function restored from a checkpoint.");
@@ -462,9 +458,9 @@ namespace CNTK
         }
     }
 
-    /*static*/ FunctionPtr Function::Load(const Dictionary& modelDictionary, const CNTK::DeviceDescriptor& device)
+    /*static*/ FunctionPtr Function::Deserialize(const Dictionary& modelDictionary, const CNTK::DeviceDescriptor& device)
     {
-        return CompositeFunction::Load(modelDictionary, device);
+        return CompositeFunction::Deserialize(modelDictionary, device);
     }
 
     // Names for the reduction operations as used by the CNTK ReduceElementsNode
@@ -839,9 +835,9 @@ namespace CNTK
         return dict;
     }
 
-    /*static*/ FunctionPtr PrimitiveFunction::Load(const Dictionary& dict, 
-                                                   const std::unordered_map<std::wstring, Variable>& uidToVariableMap,
-                                                   const CNTK::DeviceDescriptor& device)
+    /*static*/ FunctionPtr PrimitiveFunction::Deserialize(const Dictionary& dict, 
+                                                          const std::unordered_map<std::wstring, Variable>& uidToVariableMap,
+                                                          const CNTK::DeviceDescriptor& device)
     {
         static const vector<std::wstring> s_requiredDictionaryKeys = { typeKey, opKey, uidKey, attributesKey, inputsKey, nameKey };
        
@@ -973,7 +969,7 @@ namespace CNTK
         return dict;
     }
 
-    /*static*/ FunctionPtr CompositeFunction::Load(const Dictionary& dict, const CNTK::DeviceDescriptor& device)
+    /*static*/ FunctionPtr CompositeFunction::Deserialize(const Dictionary& dict, const CNTK::DeviceDescriptor& device)
     {
         static const vector<std::wstring> s_requiredDictionaryKeys = { typeKey, rootKey, nameKey, uidKey, inputsKey, functionsKey };
        
@@ -989,7 +985,7 @@ namespace CNTK
         for (const auto& dictionaryValue : inputs)
         {
             const auto& dictionary = dictionaryValue.Value<Dictionary>();
-            const auto& inputVar = Variable::Load(dictionary, device);
+            const auto& inputVar = Variable::Deserialize(dictionary, device);
 
             if (uidToInputMap.find(inputVar.Uid()) != uidToInputMap.end())
             {
@@ -1006,7 +1002,7 @@ namespace CNTK
         std::unordered_set<FunctionPtr> allPrimitiveFunctions; // this keeps all primitive functions alive until a composite function is created.
         for (const auto& dictionaryValue : functions)
         {
-            root = PrimitiveFunction::Load(dictionaryValue.Value<Dictionary>(), uidToInputMap, device);
+            root = PrimitiveFunction::Deserialize(dictionaryValue.Value<Dictionary>(), uidToInputMap, device);
             allPrimitiveFunctions.insert(root);
 
             auto primitiveFunction = dynamic_cast<const PrimitiveFunction*>(root.get());
@@ -1729,9 +1725,9 @@ namespace CNTK
 
                 std::vector<size_t> rowAllocations;
                 layout->InitAsPackedSequences(sequences, placement, rowAllocations);
-                        }
-                        else
-                        {
+            }
+            else
+            {
                 layout->Init(numSequences, maxNumTimeSteps);
 
                 // We cannot pack as some of the sequences are truncated and thus all sequences have to be

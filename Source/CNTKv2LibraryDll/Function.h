@@ -7,6 +7,7 @@
 
 #include "stdafx.h"
 #include "CNTKLibrary.h"
+#include "PrimitiveOpType.h"
 #include <iterator>
 #include "ComputationNetwork.h"
 #include "Utils.h"
@@ -193,9 +194,9 @@ namespace CNTK
 
         virtual size_t CurrentVersion() const override { return s_serializationVersion; }
 
-        static FunctionPtr Load(const Dictionary& dictionary, 
-                                const std::unordered_map<std::wstring, Variable>& uidToVariableMap, 
-                                const CNTK::DeviceDescriptor& device);
+        static FunctionPtr Deserialize(const Dictionary& dictionary, 
+                                       const std::unordered_map<std::wstring, Variable>& uidToVariableMap, 
+                                       const CNTK::DeviceDescriptor& device);
 
         virtual const std::wstring& OpName() override
         {
@@ -492,7 +493,7 @@ namespace CNTK
 
         virtual size_t CurrentVersion() const override { return s_serializationVersion; }
 
-        static FunctionPtr Load(const Dictionary& dictionary, const CNTK::DeviceDescriptor& device);
+        static FunctionPtr Deserialize(const Dictionary& dictionary, const CNTK::DeviceDescriptor& device);
 
         virtual const std::wstring& OpName() override
         {

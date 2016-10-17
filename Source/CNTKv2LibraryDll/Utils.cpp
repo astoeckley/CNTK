@@ -174,17 +174,6 @@ namespace CNTK
         return (m_dictionaryData->find(key) != m_dictionaryData->end());
     }
 
-    std::vector<std::wstring> Dictionary::Keys() const
-    {
-        std::vector<std::wstring> keys;
-        keys.reserve(m_dictionaryData->size());
-        for (const auto&it : *m_dictionaryData)
-        {
-            keys.push_back(it.first);
-        }
-        return keys;
-    }
-
     void Dictionary::Add(const Dictionary& other)
     {
         for (auto kv : *(other.m_dictionaryData))
@@ -334,7 +323,7 @@ namespace CNTK
     }
 
      template <typename T>
-    /*static*/ TrainingParameterSchedule<T>  TrainingParameterSchedule<T>::Load(const Dictionary& dict)
+    /*static*/ TrainingParameterSchedule<T>  TrainingParameterSchedule<T>::Deserialize(const Dictionary& dict)
     {
         static const vector<std::wstring> s_requiredDictionaryKeys = { typeKey, unitKey, scheduleKey };
 
