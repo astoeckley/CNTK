@@ -1719,16 +1719,16 @@ private:
                 if (m_ownerFunction != nullptr)
                     InvalidArgument("Output variables cannot be cloned");
 
-                auto clone= MakeSharedObject<VariableFields>(m_shape,
-                                                             m_varKind,
-                                                             m_dataType,
-                                                             m_ownerFunction,
-                                                             (m_value) ? m_value->DeepClone() : nullptr,
-                                                             m_needsGradient,
-                                                             m_dynamicAxes,
-                                                             m_isSparse,
-                                                             m_name,
-                                                             Internal::GenerateUid(m_varKind));
+                auto clone = MakeSharedObject<VariableFields>(m_shape,
+                                                              m_varKind,
+                                                              m_dataType,
+                                                              m_ownerFunction,
+                                                              (m_value) ? m_value->DeepClone() : nullptr,
+                                                              m_needsGradient,
+                                                              m_dynamicAxes,
+                                                              m_isSparse,
+                                                              m_name,
+                                                              Internal::GenerateUid(m_varKind));
 
                 if (m_valueInitializer)
                     clone->SetValueInitialization(*m_valueInitializer, *m_valueInitializationDevice);

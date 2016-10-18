@@ -145,21 +145,21 @@ inline void SaveAndReloadModel(CNTK::FunctionPtr& functionPtr, const std::vector
     }
 }
 
-inline CNTK::FunctionPtr FullyConnectedLinearLayer(CNTK::Variable input, size_t outputDim, const CNTK::DeviceDescriptor& device, const std::wstring& outputName = L"", size_t seed = CNTK::DefaultRandomSeed())
+inline CNTK::FunctionPtr FullyConnectedLinearLayer(CNTK::Variable input, size_t outputDim, const CNTK::DeviceDescriptor& device, const std::wstring& outputName = L"")
 {
     assert(input.Shape().Rank() == 1);
     size_t inputDim = input.Shape()[0];
 
-    auto timesParam = CNTK::Parameter({ outputDim, inputDim }, CNTK::DataType::Float, CNTK::GlorotUniformInitializer(CNTK::DefaultParamInitOutputRank, CNTK::DefaultParamInitFilterRank, CNTK::DefaultParamInitScale, unsigned long(seed)), device);
+    auto timesParam = CNTK::Parameter({ outputDim, inputDim }, CNTK::DataType::Float, CNTK::GlorotUniformInitializer(), device);
     auto timesFunction = CNTK::Times(timesParam, input);
 
     auto plusParam = CNTK::Parameter({ outputDim }, 0.0f, device);
     return CNTK::Plus(plusParam, timesFunction, outputName);
 }
 
-inline CNTK::FunctionPtr FullyConnectedDNNLayer(CNTK::Variable input, size_t outputDim, const CNTK::DeviceDescriptor& device, const std::function<CNTK::FunctionPtr(const CNTK::FunctionPtr&)>& nonLinearity, size_t seed = CNTK::DefaultRandomSeed())
+inline CNTK::FunctionPtr FullyConnectedDNNLayer(CNTK::Variable input, size_t outputDim, const CNTK::DeviceDescriptor& device, const std::function<CNTK::FunctionPtr(const CNTK::FunctionPtr&)>& nonLinearity)
 {
-    return nonLinearity(FullyConnectedLinearLayer(input, outputDim, device, L"", seed));
+    return nonLinearity(FullyConnectedLinearLayer(input, outputDim, device));
 }
 
 inline CNTK::FunctionPtr FullyConnectedFeedForwardClassifierNet(CNTK::Variable input,
@@ -168,15 +168,14 @@ inline CNTK::FunctionPtr FullyConnectedFeedForwardClassifierNet(CNTK::Variable i
                                                    size_t numHiddenLayers,
                                                    const CNTK::DeviceDescriptor& device,
                                                    const std::function<CNTK::FunctionPtr(const CNTK::FunctionPtr&)>& nonLinearity,
-                                                   const std::wstring& outputName,
-                                                   size_t seed = CNTK::DefaultRandomSeed())
+                                                   const std::wstring& outputName)
 {
     assert(numHiddenLayers >= 1);
-    auto classifierRoot = FullyConnectedDNNLayer(input, hiddenLayerDim, device, nonLinearity, seed);
+    auto classifierRoot = FullyConnectedDNNLayer(input, hiddenLayerDim, device, nonLinearity);
     for (size_t i = 1; i < numHiddenLayers; ++i)
-        classifierRoot = FullyConnectedDNNLayer(classifierRoot, hiddenLayerDim, device, nonLinearity, seed);
+        classifierRoot = FullyConnectedDNNLayer(classifierRoot, hiddenLayerDim, device, nonLinearity);
 
-    auto outputTimesParam = CNTK::Parameter(CNTK::NDArrayView::RandomUniform<float>({ numOutputClasses, hiddenLayerDim }, -0.5, 0.5, unsigned long(seed), device));
+    auto outputTimesParam = CNTK::Parameter(CNTK::NDArrayView::RandomUniform<float>({ numOutputClasses, hiddenLayerDim }, -0.5, 0.5, CNTK::DefaultRandomSeed(), device));
     return Times(outputTimesParam, classifierRoot, 1, outputName);
 }
 
@@ -431,21 +430,18 @@ inline CNTK::FunctionPtr Embedding(const CNTK::Variable& input, size_t embedding
 {
     assert(input.Shape().Rank() == 1);
     size_t inputDim = input.Shape()[0];
-
-    unsigned long seed = 1;
-
-    auto embeddingParameters = CNTK::Parameter({ embeddingDim, inputDim }, CNTK::DataType::Float, CNTK::GlorotUniformInitializer(1, 0, 1, seed), device);
+    auto embeddingParameters = CNTK::Parameter({ embeddingDim, inputDim }, CNTK::DataType::Float, CNTK::GlorotUniformInitializer(), device);
     return Times(embeddingParameters, input);
 }
 
-inline CNTK::FunctionPtr LSTMSequenceClassiferNet(const CNTK::Variable& input, size_t numOutputClasses, size_t embeddingDim, size_t LSTMDim, size_t cellDim, const CNTK::DeviceDescriptor& device, const std::wstring& outputName, size_t seed = CNTK::DefaultRandomSeed())
+inline CNTK::FunctionPtr LSTMSequenceClassiferNet(const CNTK::Variable& input, size_t numOutputClasses, size_t embeddingDim, size_t LSTMDim, size_t cellDim, const CNTK::DeviceDescriptor& device, const std::wstring& outputName)
 {
     auto embeddingFunction = Embedding(input, embeddingDim, device);
     auto pastValueRecurrenceHook = [](const CNTK::Variable& x) { return PastValue(x); };
     auto LSTMFunction = LSTMPComponentWithSelfStabilization<float>(embeddingFunction, { LSTMDim }, { cellDim }, pastValueRecurrenceHook, pastValueRecurrenceHook, device).first;
     auto thoughtVectorFunction = CNTK::Sequence::Last(LSTMFunction);
 
-    return FullyConnectedLinearLayer(thoughtVectorFunction, numOutputClasses, device, outputName, seed);
+    return FullyConnectedLinearLayer(thoughtVectorFunction, numOutputClasses, device, outputName);
 }
 
 template <typename ElementType> 

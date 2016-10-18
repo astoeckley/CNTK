@@ -46,9 +46,28 @@ namespace CNTK
     {
         if (!dict.Contains(versionKey))
         {
-             LogicError("Required key '%ls' is not found in the dictionary.", versionKey);
+             LogicError("Required key '%ls' is not found in the dictionary.", versionKey.c_str());
         } 
         return dict[versionKey].Value<size_t>();
+    }
+
+    template <typename T>
+    inline void ValidateType(const Dictionary& dict, const std::wstring& typeValue, size_t currentVersion)
+    {
+        if (!dict.Contains(typeKey))
+        {
+            const auto& version = GetVersion(dict);
+            LogicError("Required key '%ls' is not found in the dictionary "
+                            "(%s).", typeKey.c_str(), GetVersionsString<T>(currentVersion, version).c_str());
+        } 
+
+        const auto& type = dict[typeKey].Value<std::wstring>();
+        if (type != typeValue) 
+        {
+            const auto& version = GetVersion(dict);
+            LogicError("Unexpected '%ls':'%ls' in place of '%ls':'%ls' "
+                        "(%s).", typeKey.c_str(), type.c_str(), typeKey.c_str(), typeValue.c_str(), GetVersionsString<T>(currentVersion, version).c_str());
+        }
     }
 
     // Make sure that the dictionary contains all required keys, and if it does, return version value
@@ -63,31 +82,12 @@ namespace CNTK
             if (!dict.Contains(key))
             {
                  LogicError("Required key '%ls' is not found in the dictionary "
-                            "(%s).", key, GetVersionsString<T>(currentVersion, version));
+                            "(%s).", key.c_str(), GetVersionsString<T>(currentVersion, version).c_str());
             }
         }
 
         ValidateType<T>(dict, typeValue, currentVersion);
 
         return version;
-    }
-
-    template <typename T>
-    inline void ValidateType(const Dictionary& dict, const std::wstring& typeValue, size_t currentVersion)
-    {
-        if (!dict.Contains(typeKey))
-        {
-            const auto& version = GetVersion(dict);
-            LogicError("Required key '%ls' is not found in the dictionary "
-                            "(%s).", typeKey, GetVersionsString<T>(currentVersion, version));
-        } 
-
-        const auto& type = dict[typeKey].Value<std::wstring>();
-        if (type != typeValue) 
-        {
-            const auto& version = GetVersion(dict);
-            LogicError("Unexpected '%ls':'%ls' in place of 'type':'%ls' "
-                        "(%s).", typeKey, type, typeKey, typeValue, GetVersionsString<T>(currentVersion, version));
-        }
     }
 }

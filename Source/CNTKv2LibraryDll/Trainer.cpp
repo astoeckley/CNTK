@@ -260,7 +260,7 @@ namespace CNTK
         if (learnerStates.size() != m_parameterLearners.size())
         {
             LogicError("Trainer::RestoreFromCheckpoint: "
-                       "Number of learners in the checkpoint (%d) does not match the expected number (%d)",
+                       "Number of learners in the checkpoint (%zu) does not match the expected number (%zu)",
                        learnerStates.size(), m_parameterLearners.size());
         }
 

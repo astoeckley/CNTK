@@ -39,14 +39,14 @@ int main()
 
     // Note: Run the device selection tests first since later tests
     // may interfere with device selection by freezing default device
-    //DeviceSelectionTests();
+    DeviceSelectionTests();
 
-    //NDArrayViewTests();
-    //TensorTests();
-    //FunctionTests();
+    NDArrayViewTests();
+    TensorTests();
+    FunctionTests();
 
-    //FeedForwardTests();
-    //RecurrentFunctionTests();
+    FeedForwardTests();
+    RecurrentFunctionTests();
 
     SerializationTests();
     LearnerTests();

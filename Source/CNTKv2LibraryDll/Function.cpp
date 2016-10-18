@@ -929,8 +929,8 @@ namespace CNTK
         // This also applies to other enums (DataType, VariableKind, etc.)
         if (op > PrimitiveOpType::Combine)
         {
-            LogicError("Unexpected variable '%ls':'%zu' "
-                        "(%s).", opKey, op, GetVersionsString<PrimitiveFunction>(s_serializationVersion, version));
+            LogicError("Unexpected variable '%ls':'%d' "
+                        "(%s).", opKey.c_str(), op, GetVersionsString<PrimitiveFunction>(s_serializationVersion, version).c_str());
         }
 
         const auto& uid = dict[uidKey].Value<std::wstring>();
@@ -947,7 +947,7 @@ namespace CNTK
             if (uidToVariableMap.find(inputUid) == uidToVariableMap.end())
             {
                 LogicError("There are no inputs corresponging to input uid = '%ls' "
-                        "(%s).", inputUid, GetVersionsString<PrimitiveFunction>(s_serializationVersion, version));
+                        "(%s).", inputUid.c_str(), GetVersionsString<PrimitiveFunction>(s_serializationVersion, version).c_str());
             }
             inputs.push_back(uidToVariableMap.at(inputUid));
         }
@@ -1069,7 +1069,7 @@ namespace CNTK
             if (uidToInputMap.find(inputVar.Uid()) != uidToInputMap.end())
             {
                 LogicError("Input uids are not unique (several inputs share '%ls' uid) "
-                        "(%s).", inputVar.Uid(), GetVersionsString<CompositeFunction>(s_serializationVersion, version));
+                        "(%s).", inputVar.Uid().c_str(), GetVersionsString<CompositeFunction>(s_serializationVersion, version).c_str());
             }
             uidToInputMap[inputVar.Uid()] = inputVar;
         }
@@ -1100,8 +1100,8 @@ namespace CNTK
                     if (!it->second.IsPlaceholder())
                     {
                         LogicError("Unexpected variable type %ls instead of a Placeholder for input %ls variable (uid = %ls)"
-                        "(%s).", VariableKindName(it->second.Kind()), it->second.Name(), it->second.Uid(),
-                        GetVersionsString<CompositeFunction>(s_serializationVersion, version));
+                        "(%s).", VariableKindName(it->second.Kind()), it->second.Name().c_str(), it->second.Uid().c_str(),
+                        GetVersionsString<CompositeFunction>(s_serializationVersion, version).c_str());
                     }
                     placeholderReplacements[it->second] = output;
                 }

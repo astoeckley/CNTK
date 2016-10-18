@@ -282,8 +282,8 @@ namespace CNTK
             kind != VariableKind::Parameter &&
             kind != VariableKind::Placeholder)
         {
-            LogicError("Unexpected variable '%ls':'%zu' "
-                        "(%s).", kindKey, kind, GetVersionsString<Variable>(s_serializationVersion, version));
+            LogicError("Unexpected variable '%ls':'%d' "
+                        "(%s).", kindKey.c_str(), kind, GetVersionsString<Variable>(s_serializationVersion, version).c_str());
         }
         
         DataType dataType = DataType(dict[dataTypeKey].Value<std::size_t>());
@@ -291,8 +291,8 @@ namespace CNTK
             dataType != DataType::Float &&
             dataType != DataType::Double)
         {
-            LogicError("Unexpected variable '%ls':'%zu' "
-                        "(%s).", dataTypeKey, dataType, GetVersionsString<Variable>(s_serializationVersion, version));
+            LogicError("Unexpected variable '%ls':'%d' "
+                        "(%s).", dataTypeKey.c_str(), dataType, GetVersionsString<Variable>(s_serializationVersion, version).c_str());
         }
         
         const vector<DictionaryValue>& dictionaryValueVector = dict[dynamicAxisKey].Value<vector<DictionaryValue>>();

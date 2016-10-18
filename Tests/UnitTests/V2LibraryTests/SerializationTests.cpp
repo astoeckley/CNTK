@@ -78,10 +78,10 @@ NDArrayViewPtr CreateNDArrayView()
 
     if (IsGPUAvailable())
     {
-    if (rng() % 2 == 0)
-    {
-        device = DeviceDescriptor::GPUDevice(0);
-    }
+        if (rng() % 2 == 0)
+        {
+            device = DeviceDescriptor::GPUDevice(0);
+        }
     }
 
     return (rng() % 2 == 0) ? 
@@ -300,20 +300,22 @@ std::shared_ptr<std::fstream> GetFstream(const std::wstring& filePath, bool read
 #endif
 }
 
-FunctionPtr BuildFFClassifierNet(const Variable& inputVar, size_t numOutputClasses, const DeviceDescriptor& device, size_t seed = DefaultRandomSeed())
+FunctionPtr BuildFFClassifierNet(const Variable& inputVar, size_t numOutputClasses, const DeviceDescriptor& device, unsigned long seed = 1)
 {
+    Internal::SetFixedRandomSeed(seed);
     const size_t numHiddenLayers = 2;
     const size_t hiddenLayersDim = 32;
     auto nonLinearity = std::bind(Sigmoid, std::placeholders::_1, L"");
-    return FullyConnectedFeedForwardClassifierNet(inputVar, numOutputClasses, hiddenLayersDim, numHiddenLayers, device, nonLinearity, L"classifierOutput", seed);
+    return FullyConnectedFeedForwardClassifierNet(inputVar, numOutputClasses, hiddenLayersDim, numHiddenLayers, device, nonLinearity, L"classifierOutput");
 }
 
-FunctionPtr BuildLSTMClassifierNet(const Variable& inputVar, const size_t numOutputClasses, const DeviceDescriptor& device)
+FunctionPtr BuildLSTMClassifierNet(const Variable& inputVar, const size_t numOutputClasses, const DeviceDescriptor& device, unsigned long seed = 1)
 {
+    Internal::SetFixedRandomSeed(seed);
     const size_t cellDim = 25;
     const size_t hiddenDim = 25;
     const size_t embeddingDim = 50;
-    return LSTMSequenceClassiferNet(inputVar, numOutputClasses, embeddingDim, hiddenDim, cellDim, device, L"classifierOutput", 1);
+    return LSTMSequenceClassiferNet(inputVar, numOutputClasses, embeddingDim, hiddenDim, cellDim, device, L"classifierOutput");
 }
 
 void TestFunctionSaveAndLoad(const FunctionPtr& function, const DeviceDescriptor& device)
@@ -477,11 +479,7 @@ void TestTrainingWithCheckpointing(const FunctionPtr& function1, const FunctionP
     auto trainer1 = BuildTrainer(function1, labels, learningRateSchedule, momentumValues);
     auto trainer2 = BuildTrainer(function2, labels, learningRateSchedule, momentumValues);
 
-    if (device.Type() != DeviceKind::GPU)
-    {
-        // TODO: reset cuda random generator.
-        assert(AreEqual(function1, function2));
-    }
+    assert(AreEqual(function1, function2));
 
     trainer2.SaveCheckpoint(L"trainer.v2.checkpoint", false);
     trainer2.RestoreFromCheckpoint(L"trainer.v2.checkpoint", false);
@@ -538,7 +536,23 @@ void TestCheckpointing(const DeviceDescriptor& device)
     auto features1 = InputVariable({ inputDim }, false /*isSparse*/, DataType::Float, featureStreamName);
     auto labels1 = InputVariable({ numOutputClasses }, DataType::Float, labelsStreamName);
     auto net1_1 = BuildFFClassifierNet(features1, numOutputClasses, device, 1);
-    auto net1_2 = BuildFFClassifierNet(features1, numOutputClasses, device, 1);
+    FunctionPtr net1_2;
+
+    if (device.Type() == DeviceKind::GPU)
+    {
+        // TODO: instead of cloning here, reset curand generator to make sure that parameters are initialized to the same state.
+        for (auto& p : net1_1->Parameters()) 
+        {
+            // make sure all parameters are initialized
+            assert(p.Value() != nullptr);
+        }
+        net1_2 = net1_1->Clone();
+    }
+    else 
+    {
+        net1_2 = BuildFFClassifierNet(features1, numOutputClasses, device, 1);
+    }
+
     auto minibatchSource1 = TextFormatMinibatchSource(L"Train-28x28_cntk_text.txt", { { featureStreamName, inputDim }, { labelsStreamName, numOutputClasses } },  1000, false);
 
     TestTrainingWithCheckpointing(net1_1, net1_2, labels1, minibatchSource1, device);
@@ -547,8 +561,24 @@ void TestCheckpointing(const DeviceDescriptor& device)
     numOutputClasses = 5;
     auto features2 = InputVariable({ inputDim }, true /*isSparse*/, DataType::Float, featureStreamName);
     auto labels2 = InputVariable({ numOutputClasses }, DataType::Float, labelsStreamName, { Axis::DefaultBatchAxis() });
-    auto net2_1 = BuildLSTMClassifierNet(features2, numOutputClasses, device);
-    auto net2_2 = BuildLSTMClassifierNet(features2, numOutputClasses, device);
+    auto net2_1 = BuildLSTMClassifierNet(features2, numOutputClasses, device, 1);
+    FunctionPtr net2_2;
+
+    if (device.Type() == DeviceKind::GPU)
+    {
+        // TODO: instead of cloning here, reset curand generator to make sure that parameters are initialized to the same state.
+        for (auto& p : net2_1->Parameters()) 
+        {
+            // make sure all parameters are initialized
+            assert(p.Value() != nullptr);
+        }
+        net2_2 = net2_1->Clone();
+    }
+    else 
+    {
+        net2_2 = BuildLSTMClassifierNet(features2, numOutputClasses, device, 1);
+    }
+
     auto minibatchSource2 = TextFormatMinibatchSource(L"Train.ctf", { { featureStreamName, inputDim, true, L"x" }, {  labelsStreamName, numOutputClasses, false, L"y" } }, 1000, false);
 
     TestTrainingWithCheckpointing(net2_1, net2_2, labels2, minibatchSource2, device);
@@ -613,7 +643,7 @@ void TestLegacyModelSaving(const DeviceDescriptor& device)
 void SerializationTests()
 {
     fprintf(stderr, "\nSerializationTests..\n");
-/*
+
     TestDictionarySerialization(4);
     TestDictionarySerialization(8);
     TestDictionarySerialization(16);
@@ -624,7 +654,7 @@ void SerializationTests()
     TestFunctionsForEquality(DeviceDescriptor::CPUDevice());
     TestFunctionSerialization(DeviceDescriptor::CPUDevice());
     TestModelSerializationDuringTraining(DeviceDescriptor::CPUDevice());
-    */
+    
     TestCheckpointing(DeviceDescriptor::CPUDevice());
     TestLegacyModelSaving(DeviceDescriptor::CPUDevice());
 
