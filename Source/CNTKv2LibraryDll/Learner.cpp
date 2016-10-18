@@ -282,22 +282,27 @@ namespace CNTK
 
         // TODO: should we also save momentum schedule into the checkpoint?
         // If that is the case, need to be able to override this method in subclasses,
-        std::vector<DictionaryValue> parameters;
-        parameters.reserve(Parameters().size());
+        // TODO: we now store mapping from UID to Parameter value in the checkpoint,
+        // if uids turn out to be too fragile, this can be easily changed to a vector
+        // of parameters, so that in restore we don't have to lookup based on uids, 
+        // and simply restore parameters one by one in the original (dfs) order.
         for (const auto& parameter : Parameters())
         {
+            if (checkpoint.Contains(parameter.Uid()))
+            {
+                LogicError("Parameter uids must be unique");
+            }
+
             const auto& smoothedGradientValue = m_smoothedGradientValues.at(parameter);
-            parameters.push_back(*smoothedGradientValue);
+            checkpoint[parameter.Uid()] = *smoothedGradientValue;
         }
-       
-        checkpoint[parametersKey] = parameters;
 
         return checkpoint;
     }
 
     /*virtual*/ void LearnerBase::RestoreFromCheckpoint(const Dictionary& checkpoint) /*override*/
     {
-        static const vector<std::wstring> s_requiredDictionaryKeys = { typeKey, sampleCountKey, minibatchCountKey, learningRateScheduleKey, parametersKey };
+        static const vector<std::wstring> s_requiredDictionaryKeys = { typeKey, sampleCountKey, minibatchCountKey, learningRateScheduleKey };
         
         ValidateDictionary<LearnerBase>(checkpoint, s_requiredDictionaryKeys, s_learnerTypeValue, CurrentVersion());
 
@@ -308,21 +313,17 @@ namespace CNTK
         m_learningRateSchedule = TrainingParameterSchedule<double>::Deserialize(checkpoint[learningRateScheduleKey].Value<Dictionary>());
 
         auto parameters = Parameters();
-        auto dictParameters = checkpoint[parametersKey].Value<vector<DictionaryValue>>();
 
-        if (parameters.size() != dictParameters.size())
+        for (const auto& parameter : parameters)
         {
-            LogicError("Number of parameters in the dictionary (%d) does not match the expected number of learner's parameters (%d)",
-                       dictParameters.size(), parameters.size());
-        }
-
-        for (int i = 0; i < parameters.size(); i++)
-        {
-            auto parameter = parameters[i];
+            if (!checkpoint.Contains(parameter.Uid()))
+            {
+                LogicError("Checkpoint does not contain state for parameter %ls", parameter.Uid().c_str());
+            }
 
             const auto& smoothedGradientValue = m_smoothedGradientValues.at(parameter);
 
-            const NDArrayView& checkpointedValue = dictParameters[i].Value<NDArrayView>();
+            const NDArrayView& checkpointedValue = checkpoint[parameter.Uid()].Value<NDArrayView>();
             
             if (smoothedGradientValue->GetDataType() != checkpointedValue.GetDataType())
             {

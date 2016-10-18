@@ -8,9 +8,12 @@
 #include "Utils.h"
 #include "BestGpu.h"
 #include <mutex>
+#include <memory>
 #include <algorithm>
 #include <CPUMatrix.h> // For CPUMatrix::SetNumThreads
 #include <thread>
+#include "GPUMatrix.h"
+#include "Globals.h"
 
 namespace CNTK
 {
@@ -45,9 +48,9 @@ namespace CNTK
         }
 
         std::atomic<bool> s_disableAutomaticUnpackingOfPackedValues(false);
-        void DisableAutomaticUnpackingOfPackedValues()
+        void SetAutomaticUnpackingOfPackedValues(bool disable)
         {
-            s_disableAutomaticUnpackingOfPackedValues.store(true);
+            s_disableAutomaticUnpackingOfPackedValues.store(disable);
         }
 
         bool IsAutomaticUnpackingOfPackedValuesDisabled()
@@ -55,18 +58,36 @@ namespace CNTK
             return s_disableAutomaticUnpackingOfPackedValues.load();
         }
 
-        bool AreEquivalent(const Variable& var1, const Variable& var2)
+        bool AreEquivalent(const Variable& var1, const Variable& var2, bool allowParameterAndConstantsEquivalence)
         {
-            return (var1.Kind() == var2.Kind() &&
-                    var1.GetDataType() == var2.GetDataType() &&
-                    var1.NeedsGradient() == var2.NeedsGradient() &&
-                    var1.IsSparse() == var2.IsSparse() ||
-                    var1.DynamicAxes() == var2.DynamicAxes() ||
-                    var1.Shape() == var2.Shape());
+            bool areDynamicAxesCompatible = (var1.DynamicAxes().size() == var2.DynamicAxes().size());
+            auto numAxes = var1.DynamicAxes().size();
+            for (size_t i = 0; areDynamicAxesCompatible && (i < numAxes); ++i)
+                areDynamicAxesCompatible = (var1.DynamicAxes()[i].IsOrdered() == var2.DynamicAxes()[i].IsOrdered());
+
+            bool areVarKindsCompatible = (var1.Kind() == var2.Kind()) && (var1.NeedsGradient() == var2.NeedsGradient());
+
+
+            if (!areVarKindsCompatible && allowParameterAndConstantsEquivalence)
+            {
+                areVarKindsCompatible = (var1.IsParameter() && var2.IsConstant()) || (var2.IsParameter() && var1.IsConstant());
+            }
+
+            return (areVarKindsCompatible &&
+                    (var1.GetDataType() == var2.GetDataType()) &&
+                    (var1.IsSparse() == var2.IsSparse()) &&
+                    (var1.Name() == var2.Name()) &&
+                    areDynamicAxesCompatible &&
+                    ((var1.Shape() == var2.Shape()) || (AsTensorShape(var1.Shape()) == AsTensorShape(var2.Shape()))));
         }
 
         bool AreEquivalent(const FunctionPtr& f1, const FunctionPtr& f2, std::unordered_set<std::wstring>& uids)
         {
+            if (f1 == f2)
+            {
+                return true;
+            }
+
             if (uids.find(f1->Uid()) != uids.end())
             {
                 return true;
@@ -81,7 +102,12 @@ namespace CNTK
                 return false;
             }
 
-            if (f1->OpName() != f2->OpName())
+            if (f1->Name() != f2->Name())
+            {
+                return false;
+            }
+
+            if (f1->Attributes() != f2->Attributes())
             {
                 return false;
             }
@@ -135,6 +161,11 @@ namespace CNTK
         template <typename ElementType> 
         bool AreEqual(const NDArrayView& view1, const NDArrayView& view2)
         {
+            if (std::addressof(view1) == std::addressof(view2))
+            {
+                return true;
+            }
+
             if (view1.GetDataType() != view2.GetDataType() ||
                 view1.Shape() != view2.Shape())
             {
@@ -191,7 +222,35 @@ namespace CNTK
 
             LogicError("Unknown DataType");
         }
+
+        std::atomic<int> s_computationNetworkTraceLevel(0);
+        void SetComputationNetworkTraceLevel(int traceLevel)
+        {
+            s_computationNetworkTraceLevel.store(traceLevel);
+        }
+
+        int GetComputationNetworkTraceLevel()
+        {
+            return s_computationNetworkTraceLevel.load();
+        }
+
+        void SetGPUMemoryAllocationTraceLevel(int traceLevel)
+        {
+            Microsoft::MSR::CNTK::TracingGPUMemoryAllocator::SetTraceLevel(traceLevel);
+        }
+
+        void ForceSynchronousCUDAKernelExecutions()
+        {
+            Microsoft::MSR::CNTK::SyncGuard::EnableSync();
+        }
+
+        void ForceDeterministicAlgorithms()
+        {
+            Microsoft::MSR::CNTK::Globals::ForceDeterministicAlgorithms();
+        }
     }
+
+    /*static*/ const NDShape NDShape::Unknown(1, SentinelDimValueForUnknownShape);
 
     /*static*/ std::atomic<bool> DeviceDescriptor::s_defaultDeviceFrozen(false);
     /*static*/ std::shared_ptr<DeviceDescriptor> DeviceDescriptor::s_defaultDevice;
@@ -220,6 +279,9 @@ namespace CNTK
 
     /*static*/ void DeviceDescriptor::SetDefaultDevice(const DeviceDescriptor& newDefaultDevice)
     {
+        if (newDefaultDevice == DefaultDevice())
+            return;
+
         // As a testing backdoor we allow changing the default device even after being "used/frozen"
         if (!Internal::IsSettingDefaultDeviceAlwaysAllowed() && s_defaultDeviceFrozen.load())
             RuntimeError("Process wide default device cannot be changed since it has been frozen by being implicitly used as the default device in a CNTK API call");
@@ -277,9 +339,14 @@ namespace CNTK
 
     /*static*/ const std::wstring Axis::StaticAxisNamePrefix = L"staticAxis_";
 
+    /*static*/ const int Axis::SentinelStaticAxisIndexValueForDynamicAxes = std::numeric_limits<int>::max();
+    /*static*/ const int Axis::SentinelStaticAxisIndexValueForAllStaticAxes = std::numeric_limits<int>::max() - 1;
+    /*static*/ const int Axis::SentinelStaticAxisIndexValueForUnknownAxes = std::numeric_limits<int>::max() - 2;
+
     /*static*/ Axis::UniqueDynamicAxesNames Axis::s_uniqueDynamicAxisNames;
 
     /*static*/ const std::vector<Axis> Axis::DefaultInputVariableDynamicAxes = { Axis::DefaultDynamicAxis(), Axis::DefaultBatchAxis() };
+    /*static*/ const std::vector<Axis> Axis::UnknownDynamicAxes = { Axis(SentinelStaticAxisIndexValueForUnknownAxes) };
 
     /*static*/ const Axis& Axis::DefaultDynamicAxis()
     {
@@ -299,10 +366,6 @@ namespace CNTK
         return s_allStaticAxes;
     }
 
-    /*static*/ Axis Axis::NewUniqueDynamicAxis(const std::wstring& axisNamePrefix, bool isOrderedDynamicAxis /*= true*/)
-    {
-        return Axis(s_uniqueDynamicAxisNames.NewUniqueDynamicAxisName(axisNamePrefix), isOrderedDynamicAxis);
-    }
 
     void Axis::RegisterAxisName(const std::wstring& axisName)
     {

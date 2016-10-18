@@ -6,7 +6,7 @@
 
 from .. import cntk_py
 from ..utils import typemap
-
+from cntk.device import use_default_device
 MAX_UI64 = int('0xffffffffffffffff', 16)
 
 class MinibatchData(cntk_py.MinibatchData):
@@ -34,6 +34,9 @@ class MinibatchData(cntk_py.MinibatchData):
         Returns the Value object of the minibatch. 
         '''
         return self.m_data
+
+    def __len__(self):
+        return self.num_sequences()
 
 class MinibatchSource(cntk_py.MinibatchSource):
     '''
@@ -92,7 +95,7 @@ class MinibatchSource(cntk_py.MinibatchSource):
             `:class:MinibatchData`
         '''
         if device is None:
-            device = cntk_py.DeviceDescriptor.use_default_device()
+            device = use_default_device()
 
         if minibatch_size_in_sequences is None:
             return super(MinibatchSource, self).get_next_minibatch(
@@ -101,6 +104,24 @@ class MinibatchSource(cntk_py.MinibatchSource):
             return super(MinibatchSource, self).get_next_minibatch(
                 minibatch_size_in_samples,
                 minibatch_size_in_sequences, device)
+
+    def get_checkpoint_state(self):
+        '''
+        Gets the checkpoint state of the MinibatchSource.
+
+        Returns:
+            :class:`cntk_py.Dictionary`
+        '''
+        return super(MinibatchSource, self).get_checkpoint_state()
+
+    def restore_from_checkpoint(self, checkpoint):
+        '''
+        Restores the MinibatchSource state from the specified checkpoint.
+
+        Args:
+            checkpoint (:class:`cntk_py.Dictionary`): checkpoint to restore from
+        '''
+        super(MinibatchSource, self).restore_from_checkpoint(checkpoint)
 
 
 def _py_dict_to_cntk_dict(py_dict):
@@ -254,12 +275,8 @@ class ImageDeserializer(Deserializer):
         Returns:
             `dict` describing the crop transform
         '''
-        trans = {}
-        trans['type'] = 'Crop'
-        trans['cropType'] = crop_type
-        trans['cropRatio'] = ratio
-        trans['jitterType'] = jitter_type
-        return trans
+        return dict(type='Crop', cropType=crop_type, cropRatio=ratio,
+                jitterType=jitter_type)
 
     @staticmethod
     def scale(width, height, channels, interpolations='linear'):
@@ -276,13 +293,8 @@ class ImageDeserializer(Deserializer):
         Returns:
             `dict` describing the scale transform
         '''
-        trans = {}
-        trans['type'] = 'Scale'
-        trans['width'] = width
-        trans['height'] = height
-        trans['channels'] = channels
-        trans['interpolations'] = interpolations
-        return trans
+        return dict(type='Scale', width=width, height=height, channels=channels,
+                interpolations=interpolations)
 
     @staticmethod
     def mean(filename):
@@ -296,10 +308,7 @@ class ImageDeserializer(Deserializer):
         Returns:
             `dict` describing the mean transform
         '''
-        trans = {}
-        trans['type'] = 'Mean'
-        trans['meanFile'] = filename
-        return trans
+        return dict(type='Mean', meanFile=filename)
 
     # TODO color transpose
 

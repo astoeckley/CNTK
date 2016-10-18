@@ -135,6 +135,9 @@ namespace CNTK
         case DictionaryValue::Type::Bool:
             stream >> us.m_data.m_boolean;
             break;
+        case DictionaryValue::Type::Int:
+            stream >> us.m_data.m_int;
+            break;
         case DictionaryValue::Type::SizeT:
             stream >> us.m_data.m_sizeT;
             break;
@@ -165,7 +168,7 @@ namespace CNTK
         }
         case DictionaryValue::Type::Axis:
         {
-            size_t staticAxisIdx;
+            int staticAxisIdx;
             stream >> staticAxisIdx;
 
             std::wstring axisName;
@@ -250,6 +253,9 @@ namespace CNTK
         {
         case DictionaryValue::Type::Bool:
             stream << us.m_data.m_boolean;
+            break;
+        case DictionaryValue::Type::Int:
+            stream << us.m_data.m_int;
             break;
         case DictionaryValue::Type::SizeT:
             stream << us.m_data.m_sizeT;

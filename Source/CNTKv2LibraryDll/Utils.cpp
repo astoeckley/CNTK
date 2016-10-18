@@ -7,12 +7,13 @@
 #include "CNTKLibrary.h"
 #include "Utils.h"
 #include "Serialization.h"
+#include "Function.h"
 
 using namespace std;
 
 namespace CNTK
 {
-    template<typename T>
+        template<typename T>
     T* CreateDataPtr(const T& value)
     {
         return new T(value);
@@ -49,7 +50,7 @@ namespace CNTK
         m_data.m_ptr = nullptr;
     }
 
-    
+
     bool DictionaryValue::operator==(const DictionaryValue& other) const
     {
         if (this == &other)
@@ -66,6 +67,8 @@ namespace CNTK
         {
         case DictionaryValue::Type::Bool:
             return (m_data.m_boolean == other.m_data.m_boolean);
+        case DictionaryValue::Type::Int:
+            return (m_data.m_int == other.m_data.m_int);
         case DictionaryValue::Type::SizeT:
             return (m_data.m_sizeT == other.m_data.m_sizeT);
         case DictionaryValue::Type::Float:
@@ -108,7 +111,7 @@ namespace CNTK
             NDArrayView* viewPtr2 = reinterpret_cast<NDArrayView*>(other.m_data.m_ptr);
 
             return Internal::AreEqual(*viewPtr1, *viewPtr2);
-        }
+            }
         default:
             NOT_IMPLEMENTED;
         }
@@ -121,7 +124,7 @@ namespace CNTK
 
     
 
-
+        
     Dictionary::Dictionary()
         : m_dictionaryData(new unordered_map <wstring, DictionaryValue>)
     {
@@ -212,6 +215,19 @@ namespace CNTK
     bool Dictionary::operator!=(const Dictionary& other) const
     {
         return !(*this == other);    
+    }
+
+    std::pair<std::wstring, std::wstring> UidAndNameFromCNTKInternalNodeName(const std::wstring& CNTKInternalNodeName, const PrimitiveOpType& opType)
+    {
+        std::wstring uid, name;
+        std::tie(uid, name) = UidAndNameFromCNTKInternalNodeName(CNTKInternalNodeName);
+        if (uid == L"")
+        {
+            name = CNTKInternalNodeName;
+            uid = GenerateUid(opType);
+        }
+
+        return{ uid, name };
     }
 
     template <typename T>
